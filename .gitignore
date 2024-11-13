@@ -1,0 +1,3 @@
+generate/*
+terraform.tfvars
+.env

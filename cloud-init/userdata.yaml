@@ -1,0 +1,32 @@
+#cloud-config
+
+# Metadata
+hostname: ${hostname}
+create_hostname_file: true
+
+# Users
+users:
+  - name: ${ssh_username}
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: sudo
+    shell: /bin/bash
+    ssh-authorized-keys:
+      - ${ssh_public_key}
+
+# APT Configuration
+apt:
+    sources_list: |
+      Types: deb
+      URIs: https://mirrors.ustc.edu.cn/ubuntu/
+      Suites: $RELEASE
+      Components: main restricted universe multiverse
+
+# Timezone
+timezone: "Asia/Shanghai"
+
+# Package Management
+package_update: true
+packages:
+  - curl
+  - vim
+  - git

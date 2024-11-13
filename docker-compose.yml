@@ -1,0 +1,11 @@
+services:
+  vm-creator:
+    build: .
+    image: sast/vm-creator:latest
+    container_name: vm-creator
+    environment:
+      - APP_ID=${APP_ID}
+      - APP_SECRET=${APP_SECRET}
+    volumes:
+      - ./terraform/terraform.tfvars:/app/terraform/terraform.tfvars:ro
+    # restart: unless-stopped
