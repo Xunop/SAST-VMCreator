@@ -54,7 +54,17 @@ WORKDIR /app
 
 COPY --from=builder /app/vm-creator /usr/local/bin/vm-creator
 COPY --from=builder /app/cloud-init /app/cloud-init
+# Copy terraform providers cache
 COPY --from=builder /app/terraform /app/terraform
+
+RUN cat <<EOF > /app/terraform/.terraformrc
+provider_installation {
+  filesystem_mirror {
+    path = "/app/terraform/.terraform/providers"
+    include = ["registry.terraform.io/*/*"]
+  }
+}
+EOF
 
 RUN groupadd -r vmgroup && useradd -r -g vmgroup vmuser
 RUN chown -R vmuser:vmgroup /app

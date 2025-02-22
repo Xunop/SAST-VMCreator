@@ -38,7 +38,32 @@ func handleCommand(ctx context.Context, cmd Command) {
 		// Add more command handlers as needed
 	case "/help":
 		handleHelp(ctx, cmd)
+	case "/release":
+	    handleRelease(ctx, cmd)
 	}
+}
+
+func handleRelease(ctx context.Context, cmd Command) {
+	messageID, ok := activeTopics.Load("current_message_id")
+	if !ok {
+		fmt.Println("Failed to get message_id from context")
+		return
+	}
+	threadID, ok := activeTopics.Load("current_thread_id")
+	if !ok {
+		fmt.Println("Failed to get thread_id from context")
+		return
+	}
+	curThreadID := cmd.Event.Message.ThreadID
+	if threadID.(string) != curThreadID {
+		_, err := sendReply(ctx, messageID.(string), fmt.Sprintf("<at user_id=\"%s\">%s</at> Please release the lock by replying to the at bot /release command within this thread!", cmd.Event.Sender.UserID, cmd.Event.Sender.UserID), true)
+		if err != nil {
+			fmt.Println("Failed to send reply:", err)
+		}
+		return
+	}
+	terraformMutex.Unlock()
+	sendReply(ctx, cmd.Event.Message.MessageID, "Lock released", false)
 }
 
 func handleHelp(ctx context.Context, cmd Command) {
@@ -53,7 +78,7 @@ var terraformMutex sync.Mutex
 
 func handleCreateVM(ctx context.Context, cmd Command) {
 	if !terraformMutex.TryLock() {
-		_, err := sendReply(ctx, cmd.Event.Message.MessageID, "another Terraform deployment is running, please wait and retry", false)
+		_, err := sendReply(ctx, cmd.Event.Message.MessageID, "another Terraform deployment is running", false)
 		if err != nil {
 			fmt.Println("Failed to send reply:", err)
 		}
@@ -76,9 +101,11 @@ func handleCreateVM(ctx context.Context, cmd Command) {
 	// Store current topic thread id in context
 	ctx = context.WithValue(ctx, "thread_id", msgRsp.ThreadID)
 	ctx = context.WithValue(ctx, "message_id", msgRsp.MessageID)
+	activeTopics.Store("current_message_id", msgRsp.MessageID)
+	activeTopics.Store("current_thread_id", msgRsp.ThreadID)
 
 	select {
-	case <-time.After(3 * time.Minute):
+	case <-time.After(5 * time.Minute):
 		// Remove the topic if no reply is received within 5 minutes
 		activeTopics.Delete(msgRsp.ThreadID)
 		terraformMutex.Unlock()
@@ -88,6 +115,7 @@ func handleCreateVM(ctx context.Context, cmd Command) {
 			terraformMutex.Unlock() // Release lock if reply fails
 			return
 		}
+		return
 	case userConf := <-configChan:
 		err := applyTerraformConfig(ctx, userConf)
 		// If an error occurs, send a failure message
@@ -214,6 +242,7 @@ func applyTerraformConfig(ctx context.Context, config map[string]string) error {
 	if err := os.MkdirAll(dirPath, 0755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dirPath, err)
 	}
+	defer clearUp(ctx)
 	fmt.Println("Running Terraform in directory:", dirPath)
 
 	// Define paths for required files and create symbolic links
@@ -266,6 +295,17 @@ func applyTerraformConfig(ctx context.Context, config map[string]string) error {
 	}
 
 	return nil
+}
+
+// clearUp cleans up the working directory after Terraform deployment(wheather success or failure)
+func clearUp(ctx context.Context) error {
+	threarID, ok := ctx.Value("thread_id").(string)
+	if !ok {
+		return fmt.Errorf("thread_id not found in context")
+	}
+
+	dirPath := filepath.Join("generate", threarID)
+	return os.RemoveAll(dirPath)
 }
 
 // createSymlink safely creates a symbolic link

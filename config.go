@@ -14,7 +14,9 @@ func init() {
 	AppID = os.Getenv("APP_ID")
 	AppSecret = os.Getenv("APP_SECRET")
     readConfig()
-	HelpMsg = `/createvm - 创建虚拟机
+	HelpMsg = `一切指令都需要@Bot，例如：@Bot /create_vm
+/create_vm - 创建虚拟机，Bot 会创建一个话题并发送一个示例配置，用户可以根据示例配置修改后发送给 Bot（需要在话题内 @Bot）
+/release - 释放创建虚拟机的锁，Bot 会释放创建虚拟机的锁，用户可以重新创建虚拟机
 /help - 显示帮助信息
 配置文件解释：
 esxi_hostname  = "ip"                                     # ESXI 主机地址
